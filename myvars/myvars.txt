@@ -1,0 +1,468 @@
+alias lp='ls -lrt -d -1 "$PWD"/{*,.*}'
+HOMEDIR=/home/$HOSTNAME
+cd $HOMEDIR
+readarray -t applist < <(ls -l $HOMEDIR/| awk '/^d/ {print $NF}')
+
+[[ -d /var/cw/systeam/.vim-backup ]] || mkdir /var/cw/systeam/.vim-backup > /dev/null 2>&1
+cat <<- _EOF_ > /root/.vimrc
+set pastetoggle=<F3>
+nnoremap <F4> :set number!<CR>
+syntax on
+filetype on
+set backup
+set backupdir=/var/cw/systeam/.vim-backup
+set writebackup
+set backupcopy=yes
+au BufWritePre * let &bex ='_at_' . strftime("%F-%H-%M")
+set hlsearch
+set tabstop=4
+set softtabstop=4
+set shiftwidth=4
+set ignorecase
+set smartcase
+_EOF_
+
+
+backup() {
+    local src="$1"
+    local dest="${src}-backup"
+    
+    if [ -e "$src" ]; then
+        mv "$src" "$dest"
+        echo "Moved $src to $dest"
+    else
+        echo "$src does not exist."
+    fi
+}
+
+
+###################################################################################################################
+
+imunify_status (){
+    local var="$1"
+
+    echo "Checking Global Black/Grey listing for IP: $var"
+    imunify360-agent ip-list synced --by-ip "$var"
+
+    echo "Checking Local Black/Grey listing for IP: $var"
+    imunify360-agent ip-list local list --by-ip "$var"
+}
+
+imunify_white (){
+      local var="$1"
+    
+    echo "Adding IP: $var to Local Whitelist with purpose 'white'."
+    imunify360-agent ip-list local add --purpose white "$var"
+}
+
+imunify_black (){
+      local var="$1"
+    
+    echo "Adding IP: $var to Local Blacklist with purpose 'black'."
+    imunify360-agent ip-list local add --purpose black "$var"
+}
+
+backup_zip(){
+      local variable="$1"
+    
+    # Create MySQL dump
+    echo "Creating MySQL dump for database: $variable"
+    mysqldump "$variable" > "$variable.sql"
+    
+    # Zip all files in the current directory
+    echo "Zipping all files into: $variable.zip"
+    find . -type f -print | zip "$variable.zip" -@
+}
+
+snr_file(){
+      local target_text="$1"       # The text to find
+    local replacement_text="$2"  # The text to replace with
+    local file_name="$3"         # The name of the file to modify
+    
+    # Perform search and replace using sed
+    echo "Replacing '$target_text' with '$replacement_text' in file: $file_name"
+    sed -i "s|$target_text|$replacement_text|g" "$file_name"
+}
+
+snr_allfile(){
+    local search_text="$1"       # The text to find
+    local replace_text="$2"      # The text to replace with
+
+    # Perform search and replace using find and sed
+    echo "Replacing '$search_text' with '$replace_text' in all files under the current directory."
+    find ./ -type f -exec sed -i -e "s|$search_text|$replace_text|g" {} \;
+}
+
+high_cpu(){
+    # Change to the home directory
+    cd ~ || { echo "Failed to change to home directory."; return 1; }
+
+    # Download the script
+    wget https://raw.githubusercontent.com/elishaJ/cw_automations/main/server/administration/apm.sh -O apm.sh
+
+    # Check if wget was successful
+    if [[ $? -ne 0 ]]; then
+        echo "Failed to download the script."
+        return 1
+    fi
+
+    # Execute the script
+    bash apm.sh
+
+    # Check if the script executed successfully
+    if [[ $? -ne 0 ]]; then
+        echo "The script encountered an error during execution."
+        return 1
+    fi
+
+    # Remove the script
+    rm apm.sh
+
+    echo "Script executed and removed successfully."
+}
+
+######################################################################################################################
+
+mkcd () {
+	last=$(eval "echo \$$#")
+	if [ ! -n "$last" ]; then
+		echo "Enter a directory name"
+	elif [ -d $last ]; then
+		echo "\`$last' already exists"
+	else
+		mkdir $@ && cd $last
+	fi
+	}
+
+ipinfo () {
+	/usr/bin/curl -s "https://ipinfo.io/$1\?token=0b4b40014973a0"
+	}
+
+pastebin() {
+    BASE_URL="https://pastebin.afraz.dev"
+    #local UAGENT="AFRAZ AHMED" 
+    case $1 in
+        "get")
+            curl -s "${BASE_URL}/$2"
+            ;;
+        "post")
+            ( curl -Fc=@- -Fe="$2" "${BASE_URL}" )
+            ;;
+        *)
+            echo "Invalid command"
+            ;;
+    esac
+}
+
+
+magerun () {
+  FILE="/usr/bin/n98-magerun2"
+  if [[ -s $FILE ]]; then
+      /usr/bin/n98-magerun2 "$@" --skip-root-check
+  else
+      echo "Program is not installed.. Installing now..."
+      curl -sS -O https://files.magerun.net/n98-magerun2-latest.phar && chmod +x n98-magerun2-latest.phar
+	if [[ $(echo $?) == '0' ]]; then
+      		mv n98-magerun2-latest.phar /usr/bin/n98-magerun2
+      		/usr/bin/n98-magerun2 "$@" --skip-root-check
+	else
+		echo "Automatic install failed. Please install manually."
+	fi
+  fi
+  }
+
+
+st() {
+  if [[ -z "$ORIG" ]]; then
+    ORIG=$PS1
+  fi
+  TITLE="\[\e]2;$*\a\]"
+  PS1=${ORIG}${TITLE}
+}
+
+rpl() {
+    array=($@)
+    len=${#array[@]}
+    _original=$1
+    _replacement=${array[@]:1:$len}
+    fc -s "$_original=$_replacement"
+}
+app () {
+	grep -lr "$(echo -e "$1" | sed -e 's|^[^/]*//| |' -e 's|/.*$||')" $HOMEDIR/*/conf | \
+	awk 'END{split($0,a,"/"); print a[4]}'
+	}
+
+wp () {
+	sudo --user="$(stat -c '%U' .)" /usr/local/bin/wp "$@"
+	}
+
+host () {
+	/usr/bin/host $(echo $1 | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+	}
+
+master () {
+	su $(grep master /etc/passwd | head -n 1 | cut -d ":" -f1)
+	}
+
+fixperm() {
+FPM=php$(php -v  | head -n 1 | cut -d " " -f2 | cut -d "." -f1,2)-fpm
+appsDir=/home/master/applications
+if grep -q "UMask=0002" /lib/systemd/system/$FPM.service
+then
+    echo "The UMask is already added"                                    
+else
+    sed -i -e '/[Service]/aUMask=0002' /lib/systemd/system/$FPM.service
+    systemctl daemon-reload
+    /etc/init.d/$FPM restart 
+fi
+	#/usr/bin/curl -s https://raw.githubusercontent.com/aphraz/cloudways/master/permissions.sh?Sdsdads | /bin/bash
+if [ $# -eq 0 ]; then
+                for i in $(ls -l $HOMEDIR/| awk '/^d/ {print $NF}')
+                do
+                        echo -e "\nFixing permissions for: $i"
+                        chown -R $i:www-data $HOMEDIR/$i/public_html
+                        find $HOMEDIR/$i/public_html/ \
+                        \( -type d -not -perm 775 -exec chmod 775 {} + \) \
+                        -or \
+                        \( -type f -not -perm 664 -exec chmod 664 {} + \)
+                done
+else
+		for args in "$@"
+                do
+                        cl_args=${args%/}
+                        if app_exist "${applist[*]}" "$cl_args"; then
+				echo -e "\nFixing permissions for: $cl_args"
+                          	chown -R $cl_args:www-data $HOMEDIR/$cl_args/public_html
+                          	find $HOMEDIR/$cl_args/public_html/ \
+                          	\( -type d -not -perm 775 -exec chmod 775 {} + \) \
+                          	-or \
+                          	\( -type f -not -perm 664 -exec chmod 664 {} + \)
+			else
+				echo ""
+				echo -n $'\U274E '
+				echo "There seems to be no app by the name, $cl_args.."
+				echo "Available apps are: ${applist[*]}"
+			fi
+
+                done
+fi	
+	}
+
+slowlog() {
+	if [ $# -eq 0 ]; then
+	     echo -n $'\U274E '
+	     echo '[WARN] You did not provide any app.'
+	     echo "Available apps are: ${applist[*]}"
+	else
+	    for args in "$@"
+        	do
+          	  cl_args=${args%/}
+          	  if app_exist "${applist[*]}" "$cl_args"; then
+                    echo ""
+            	    echo -e "App: $cl_args"
+	    	    gawk 'NR==1 {print substr($NF, 1, length($NF)-1)}' $HOMEDIR/$cl_args/conf/server.nginx
+            	    for PID in $(gawk '{print}' $HOMEDIR/$cl_args/logs/php-app.access.log | sort -nbrk 12,12 |  \
+		    head| gawk '{print $11}')
+			do 
+			  gawk "/pid $PID/,/^$/" $HOMEDIR/$cl_args/logs/php-app.slow.log
+			done
+		  else
+		    echo ""
+		    echo -n $'\U274E '
+		    echo "There seems to be no app by the name, $cl_args.."
+		    echo "Available apps are: ${applist[*]}"
+		  fi
+		done
+	fi
+	}
+
+pidmem () {
+	if [ $# -eq 0 ]; then
+	  for A in $(ls -l $HOMEDIR/| gawk '/^d/ {print $NF}'); 
+	    do
+		echo ""
+		echo -e "App: $A" 
+		gawk 'NR==1 {print substr($NF, 1, length($NF)-1)}' $HOMEDIR/$A/conf/server.nginx
+		gawk -v OFS="\t"  \
+		'BEGIN{printf("\n%s\t%s\n", "PID","Memory")} {SUM[$11] += $13} END {for (s in SUM) \
+		printf("%d\t%.2f %s\n", s,SUM[s]/1024/1024,"MB") | "sort -nbrk2,2 | head"}' \
+		$HOMEDIR/$A/logs/php-app.access.log
+	    done
+	else
+	    for args in "$@"
+                do
+                    cl_args=${args%/}
+                    if app_exist "${applist[*]}" "$cl_args"; then
+                     	echo "" 
+                     	echo -e "App: $cl_args"
+                     	gawk 'NR==1 {print substr($NF, 1, length($NF)-1)}' $HOMEDIR/$cl_args/conf/server.nginx
+                     	gawk -v OFS="\t"  \
+			'BEGIN{printf("\n%s\t%s\n", "PID","Memory")} {SUM[$11] += $13} END {for (s in SUM) \
+			printf("%d\t%.2f %s\n", s,SUM[s]/1024/1024,"MB") | "sort -nbrk2,2 | head"}' \
+			$HOMEDIR/$cl_args/logs/php-app.access.log
+	 	    else				
+	 		echo ""
+			echo -n $'\U274E '
+			echo "There seems to be no app by the name, $cl_args.."
+			echo "Available apps are: ${applist[*]}"
+	            fi
+		done
+	fi
+	}
+
+concurr () {
+	watch -xtn 0.5 awk '$2 ~ /:0050|:01BB/ && $4 ~ /01/ {count +=1;} END {print "Concurrent Web Connections: ",count}' /proc/net/tcp
+	}
+
+app_exist () {
+APPS=$1
+VALUE=$2
+echo $APPS| tr ' ' '\n' | grep -x -q -F "$VALUE"
+}
+
+list-restore () {
+
+if [ $# -eq 0 ]; then
+                for i in $(ls -l /home/master/applications/| awk '/^d/ {print $NF}')
+                do
+                        echo -e "\nApp: $i"
+                        /var/cw/scripts/bash/duplicity_restore.sh --src $i -c
+                done
+else
+		for args in "$@"
+                do
+                        cl_args=${args%/}
+                        if app_exist "${applist[*]}" "$cl_args"; then
+				echo -e "\nApp: $cl_args"
+                          	/var/cw/scripts/bash/duplicity_restore.sh --src $cl_args -c
+			else
+				echo ""
+				echo -n $'\U274E '
+				echo "There seems to be no app by the name, $cl_args.."
+				echo "Available apps are: ${applist[*]}"
+			fi
+
+                done
+fi
+        }
+
+reset-services () { 
+    services=("nginx" "varnish" "apache2" "php-fpm" "mysql" "memcached" "redis-server")
+
+    for service in "${services[@]}"; do
+        if [[ $service == "php-fpm" ]]; then
+            service=$(php -v | awk '{print "php"substr($2,1,3)"-fpm";exit}')
+        fi
+
+        echo "Restarting $service..."
+        if systemctl restart $service; then
+            echo "Successfully restarted: $(tput bold)$(tput setaf 1)$service$(tput sgr0)."
+        else
+            echo "Failed to restart: $(tput bold)$(tput setaf 1)$service$(tput sgr0)."
+            echo "Latest logs:"
+            journalctl -u $service -n 10 --no-pager | grep -v '^-- Logs begin'
+        fi
+    done
+}
+
+status-services () {
+    echo "$(tput bold)$(tput setaf 1)Nginx:$(tput sgr0)"
+    systemctl status nginx | awk '/Active/ {$1="";print $0}'
+    
+    echo "$(tput bold)$(tput setaf 1)Varnish:$(tput sgr0)"
+    systemctl status varnish | awk '/Active/ {$1="";print $0}'
+    
+    echo "$(tput bold)$(tput setaf 1)Apache:$(tput sgr0)"
+    systemctl status apache2 | awk '/Active/ {$1="";print $0}'
+    
+    echo "$(tput bold)$(tput setaf 1)PHP-FPM:$(tput sgr0)"
+    systemctl status $(php -v | awk '{print "php"substr($2,1,3)"-fpm";exit}') | awk '/Active/ {$1="";print $0}'
+    
+    echo "$(tput bold)$(tput setaf 1)MySQL/MariaDB:$(tput sgr0)"
+    systemctl status mysql | awk '/Active/ {$1="";print $0}'
+    
+    echo "$(tput bold)$(tput setaf 1)Memcache:$(tput sgr0)"
+    systemctl status memcached | awk '/Active/ {$1="";print $0}'
+    
+    echo "$(tput bold)$(tput setaf 1)Redis:$(tput sgr0)"
+    ( systemctl status redis-server | awk '/Active/ {$1="";print $0}' ) 2> /dev/null
+}
+
+usage () {
+  num_cores=$(nproc)
+
+  get_all_descendant_pids() {
+    local parent_pid=$1
+    local child_pids=$(pgrep -P $parent_pid)
+
+    for child_pid in $child_pids; do
+      get_all_descendant_pids $child_pid
+    done
+
+    echo $child_pids
+  }
+
+  services=("nginx" "varnish" "apache2" "php-fpm" "mysql" "memcached" "redis-server")
+  
+  for service in "${services[@]}"; do
+    if [[ $service == "php-fpm" ]]; then
+      service=$(php -v | awk '{print "php"substr($2,1,3)"-fpm";exit}')
+    fi
+    main_pid=$(systemctl show -p MainPID $service 2>/dev/null | cut -d= -f2)
+    
+    if [ -n "$main_pid" -a -e "/proc/$main_pid" ]; then
+      all_pids="$main_pid $(get_all_descendant_pids $main_pid)"
+      total_files=0
+      total_cpu=0.0
+
+      for pid in $all_pids; do
+        if [ -n "$pid" -a -e "/proc/$pid" ]; then
+          num_files=$(lsof -p $pid 2>/dev/null | wc -l)
+          cpu=$(ps -p $pid -o %cpu= 2>/dev/null)
+          
+          if [ $? -eq 0 -a -n "$cpu" ]; then
+            total_files=$((total_files + num_files))
+            total_cpu=$(echo "$total_cpu + $cpu" | bc)
+          fi
+        fi
+      done
+      
+      total_cpu=$(echo "$total_cpu / $num_cores" | bc -l)
+      total_cpu=$(printf "%.1f" $total_cpu)
+
+      echo "$(tput bold)$(tput setaf 1)$service: $(tput sgr0)"
+      systemctl status $service | awk '/Tasks:|Memory/ {print $0}'
+      echo "Open Files: $total_files"
+      echo "CPU Usage: $total_cpu%"
+    else
+      echo "$(tput bold)$(tput setaf 1)$service: $(tput sgr0)Not running"
+    fi
+  done
+}
+
+sqlvars () {
+	mysqladmin variables | tr -d " " | awk -F'|' '{print $2 " = " $3}'
+	}
+apptype () {
+	awk '/server_name/ {split($2,a,"-") ; print a[1]; exit}' $HOMEDIR/$1/conf/server.nginx
+	}
+
+rm () {
+array=( $@ )
+FOUND="0"
+for flags in "${!array[@]}"
+do
+        if [[ "${array[$flags]}" =~ ^-[rd]?f ]]; then
+                FOUND="1"
+                array[$flags]="${array[$flags]/f/I}"
+		break
+        fi
+done
+[[ "$FOUND" == "1" ]] && /bin/rm ${array[*]} || /bin/rm "$@"
+        } 
+
+cleanup () {
+	rm -f /root/.vimrc
+	find /var/cw/systeam/.vim-backup/ -type f -mtime +30 -delete
+	}
+trap cleanup EXIT
