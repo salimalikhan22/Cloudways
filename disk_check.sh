@@ -78,9 +78,9 @@ loading_msg() {
     echo "All Database Size (MySQL): $db_total_human"
 
     echo ""
-    loading_msg "Finding top 15 largest directories on the server"
-    echo "---- TOP 15 Largest Directories on the Server ----"
-    du -ahx / 2>/dev/null | sort -rh | head -n 15
+    loading_msg "Space Consuption on known folders"
+    echo "---- Space Consuption on known folders ----"
+    du -hsL /var/log /var/lib /var /home/master/applications /home/master /home/.duplicity /home/backups /tmp /usr 2>/dev/null | sort -rh | head -n 15
 
     echo ""
     echo "========== END OF REPORT =========="
