@@ -64,13 +64,13 @@ fi
 echo "Creating backup archive (optimized with hidden files)..."
 
 # Include all files in current directory including hidden ones
-find . -mindepth 1 -print | zip -q "$BACKUP_FILE" -@
+find . -mindepth 1 -print | zip "$BACKUP_FILE" -@
 
 # Optionally include private_html
 if $INCLUDE_PRIVATE; then
     if [[ -d "../private_html" ]]; then
         echo "Including private_html directory..."
-        find ../private_html -type f -print | zip -q "$BACKUP_FILE" -@
+        find ../private_html -type f -print | zip "$BACKUP_FILE" -@
     else
         echo "Warning: private_html directory not found — skipping."
     fi
