@@ -186,6 +186,38 @@ high_cpu(){
     echo "Script executed and removed successfully."
 }
 
+restore() {
+    # Set URL and temporary script path
+    SCRIPT_URL="https://github.com/salimalikhan22/Cloudways/raw/refs/heads/master/scripts/restore.sh"
+    TMP_SCRIPT="/tmp/restore.sh"
+
+    echo "Downloading restore script to $TMP_SCRIPT..."
+
+    # Download the restore script to /tmp
+    wget -q "$SCRIPT_URL" -O "$TMP_SCRIPT"
+    if [[ $? -ne 0 ]]; then
+        echo "Failed to download the restore script."
+        return 1
+    fi
+
+    # Make it executable
+    chmod +x "$TMP_SCRIPT"
+
+    echo "Executing restore script..."
+    # Execute the script
+    bash "$TMP_SCRIPT"
+    if [[ $? -ne 0 ]]; then
+        echo "The restore script encountered an error during execution."
+        rm -f "$TMP_SCRIPT"
+        return 1
+    fi
+
+    # Remove the script after execution
+    rm -f "$TMP_SCRIPT"
+    echo "Restore script executed and removed successfully."
+}
+
+
 ######################################################################################################################
 
 
