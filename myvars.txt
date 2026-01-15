@@ -22,6 +22,22 @@ set ignorecase
 set smartcase
 _EOF_
 
+[[ -d /var/cw/systeam/.nano-backup ]] || mkdir /var/cw/systeam/.nano-backup > /dev/null 2>&1
+cat <<- _EOF_ > /root/.nanorc
+set linenumbers
+set tabsize 4
+_EOF_
+
+nano() {
+    for file in "$@"; do
+        if [[ -f "$file" && ! "$file" =~ ^- ]]; then
+            cp "$file" "/var/cw/systeam/.nano-backup/$(basename "$file")_$(date +%F-%H-%M-%S)"
+        fi
+    done
+    /bin/nano "$@"
+}
+
+
 
 backup() {
     local src="$1"
@@ -35,8 +51,6 @@ backup() {
     fi
 }
 
-
-###################################################################################################################
 
 # pud - enhanced pushd wrapper that accepts:
 # 1) directory path
@@ -65,7 +79,6 @@ pud() {
 }
 
 
-
 # dl - run dirs with selected flags, accepting letters v, c, l corresponding to -v, -c, -l
 dl() {
   # Build flags string from letters
@@ -83,7 +96,6 @@ dl() {
   # Run dirs with constructed flags
   dirs $flags
 }
-
 
 inc_worker() {
     # Set TasksMax to infinity
@@ -124,17 +136,51 @@ imunify_black (){
     imunify360-agent ip-list local add --purpose black "$var"
 }
 
-backup_zip(){
-      local variable="$1"
+#backup_zip(){
+#      local variable="$1"
 
     # Create MySQL dump
-    echo "Creating MySQL dump for database: $variable"
-    mysqldump "$variable" > "$variable.sql"
+#    echo "Creating MySQL dump for database: $variable"
+#    mysqldump "$variable" > "$variable.sql"
 
     # Zip all files in the current directory
-    echo "Zipping all files into: $variable.zip"
+#    echo "Zipping all files into: $variable.zip"
+#    find . -type f -print | zip "$variable.zip" -@
+#}
+
+
+backup_zip() {
+    local variable="$1"
+    local include_private
+
+    # Ask whether to include private_html
+    read -p "Do you want to include 'private_html' in the backup? (y/n): " include_private
+
+    # Check if WordPress installation
+    if [[ -f "wp-config.php" ]]; then
+        echo "Detected WordPress installation. Using wp-cli to export the database."
+        wp db export "$variable.sql"
+    else
+        echo "Not a WordPress installation. Using mysqldump to export the database: $variable"
+        mysqldump "$variable" > "$variable.sql"
+    fi
+
+    # Build zip command
+    echo "Creating zip archive: $variable.zip"
     find . -type f -print | zip "$variable.zip" -@
+
+    if [[ "$include_private" == "y" || "$include_private" == "Y" ]]; then
+        if [[ -d "../private_html" ]]; then
+            echo "Including private_html in the zip."
+            find ../private_html -type f -print | zip "$variable.zip" -@
+        else
+            echo "Warning: '../private_html' directory not found."
+        fi
+    else
+        echo "Skipping private_html as requested."
+    fi
 }
+
 
 snr_file(){
       local target_text="$1"       # The text to find
@@ -541,8 +587,20 @@ done
 [[ "$FOUND" == "1" ]] && /bin/rm ${array[*]} || /bin/rm "$@"
         }
 
+mv() {
+    echo "About to run: mv $@"
+    read -p "Continue? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        /bin/mv "$@"
+    else
+        echo "mv command cancelled"
+        return 1
+    fi
+}
+
 cleanup () {
         rm -f /root/.vimrc
-        find /var/cw/systeam/.vim-backup/ -type f -mtime +30 -delete
+        find /var/cw/systeam/.{vim,nano}-backup/ -type f -mtime +30 -delete
         }
 trap cleanup EXIT
