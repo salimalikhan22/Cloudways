@@ -2,6 +2,20 @@
 set -euo pipefail
 
 APP_NAME="${1:-}"
+shift || true  # Shift to process flags
+
+INCLUDE_PRIVATE=false
+
+# Parse flags
+while getopts ":p" opt; do
+  case "$opt" in
+    p) INCLUDE_PRIVATE=true ;;
+    *)
+      echo "Usage: backup.sh <app_name> [-p]"
+      exit 1
+      ;;
+  esac
+done
 
 BASE_PATH="/home/master/applications/${APP_NAME}"
 WEBROOT="${BASE_PATH}/public_html"
@@ -10,7 +24,7 @@ BACKUP_FILE="${WEBROOT}/${APP_NAME}.zip"
 SQL_FILE="${WEBROOT}/${APP_NAME}.sql"
 
 usage() {
-    echo "Usage: backup.sh <app_name>"
+    echo "Usage: backup.sh <app_name> [-p]"
     exit 1
 }
 
@@ -36,10 +50,10 @@ fi
 echo "Application validated: $APP_NAME"
 echo "Webroot: $WEBROOT"
 
-cd "$WEBROOT"
+cd "$BASE_PATH"
 
 # 4. Export database
-if [[ -f "wp-config.php" ]]; then
+if [[ -f "${WEBROOT}/wp-config.php" ]]; then
     echo "WordPress detected. Exporting database using wp-cli."
     wp db export "$SQL_FILE" --allow-root
 else
@@ -47,15 +61,25 @@ else
     mysqldump "$APP_NAME" > "$SQL_FILE"
 fi
 
-# 5. Create zip archive
-echo "Creating backup archive..."
-find . -type f -print | zip "$BACKUP_FILE" -@
+# 5. Build list of directories to zip
+ZIP_CONTENTS=("public_html")
 
-# 6. Include private_html if exists
-if [[ -d "$PRIVATE_HTML" ]]; then
-    echo "Including private_html directory."
-    find "$PRIVATE_HTML" -type f -print | zip "$BACKUP_FILE" -@
+if $INCLUDE_PRIVATE; then
+    if [[ -d "$PRIVATE_HTML" ]]; then
+        if find "$PRIVATE_HTML" -type f | grep -q .; then
+            echo "Including private_html directory (files detected)."
+            ZIP_CONTENTS+=("private_html")
+        else
+            echo "private_html exists but is empty — skipping."
+        fi
+    else
+        echo "private_html directory not found — skipping."
+    fi
 fi
+
+# 6. Create zip archive
+echo "Creating backup archive..."
+zip -r "$BACKUP_FILE" "${ZIP_CONTENTS[@]}"
 
 # 7. Cleanup SQL file
 rm -f "$SQL_FILE"
