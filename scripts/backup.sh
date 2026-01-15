@@ -50,7 +50,7 @@ fi
 echo "Application validated: $APP_NAME"
 echo "Webroot: $WEBROOT"
 
-cd "$BASE_PATH"
+cd "$WEBROOT"
 
 # 4. Export database
 if [[ -f "${WEBROOT}/wp-config.php" ]]; then
