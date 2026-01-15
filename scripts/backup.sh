@@ -61,7 +61,7 @@ fi
 rm -f "$SQL_FILE"
 
 # 8. Set ownership
-chown "${APP_NAME}:${APP_NAME}" "$BACKUP_FILE"
+chown "${APP_NAME}:" "$BACKUP_FILE"
 
 echo "Backup completed successfully."
 echo "Backup location: $BACKUP_FILE"
