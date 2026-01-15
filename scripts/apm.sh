@@ -83,11 +83,22 @@ fi;
 echo $'\n'"Checking for OOM kills in syslog..."
 grep oom-kill /var/log/syslog || echo "No OOM kills found"
 
-# Check PHP-FPM logs for max_children
-echo $'\n'"Checking PHP-FPM logs for max_children..."
-for php_log in /var/log/php*.log /var/log/php*.*-fpm.log; do
-    [ -f "$php_log" ] && echo "=== $php_log ===" && grep -i max_children "$php_log" || true
-done
+# Check PHP-FPM logs for max_children based on active PHP version
+echo $'\n'"Checking PHP-FPM log for max_children..."
+
+# Detect PHP version
+php_version=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
+
+# Construct log file path (common pattern)
+php_log="/var/log/php${php_version}-fpm.log"
+
+if [ -f "$php_log" ]; then
+    echo "=== $php_log ==="
+    grep -i max_children "$php_log" || echo "No max_children entries found"
+else
+    echo "PHP-FPM log for version $php_version not found at $php_log"
+fi
+
 
 # cd - && rm apm.sh;
 exit;
