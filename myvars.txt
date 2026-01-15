@@ -38,20 +38,6 @@ nano() {
 }
 
 
-
-backup() {
-    local src="$1"
-    local dest="${src}-backup"
-
-    if [ -e "$src" ]; then
-        mv "$src" "$dest"
-        echo "Moved $src to $dest"
-    else
-        echo "$src does not exist."
-    fi
-}
-
-
 # pud - enhanced pushd wrapper that accepts:
 # 1) directory path
 # 2) +N (rotate stack forward N times)
@@ -133,7 +119,7 @@ imunify_black (){
       local var="$1"
 
     echo "Adding IP: $var to Local Blacklist with purpose 'black'."
-    imunify360-agent ip-list local add --purpose black "$var"
+    imunify360-agent ip-list local add --purpose drop "$var"
 }
 
 
@@ -200,48 +186,12 @@ high_cpu(){
     echo "Script executed and removed successfully."
 }
 
-t_auth() {
-  if [ -z "$1" ]; then
-    echo "Please provide a search term."
-    return 1
-  fi
-
-  tail -f /var/log/auth.log | grep -- "$1"
-}
-
 ######################################################################################################################
 
-mkcd () {
-        last=$(eval "echo \$$#")
-        if [ ! -n "$last" ]; then
-                echo "Enter a directory name"
-        elif [ -d $last ]; then
-                echo "\`$last' already exists"
-        else
-                mkdir $@ && cd $last
-        fi
-        }
 
 ipinfo () {
         /usr/bin/curl -s "https://ipinfo.io/$1\?token=0b4b40014973a0"
         }
-
-pastebin() {
-    BASE_URL="https://pastebin.afraz.dev"
-    #local UAGENT="AFRAZ AHMED"
-    case $1 in
-        "get")
-            curl -s "${BASE_URL}/$2"
-            ;;
-        "post")
-            ( curl -Fc=@- -Fe="$2" "${BASE_URL}" )
-            ;;
-        *)
-            echo "Invalid command"
-            ;;
-    esac
-}
-
 
 magerun () {
   FILE="/usr/bin/n98-magerun2"
@@ -260,21 +210,6 @@ magerun () {
   }
 
 
-st() {
-  if [[ -z "$ORIG" ]]; then
-    ORIG=$PS1
-  fi
-  TITLE="\[\e]2;$*\a\]"
-  PS1=${ORIG}${TITLE}
-}
-
-rpl() {
-    array=($@)
-    len=${#array[@]}
-    _original=$1
-    _replacement=${array[@]:1:$len}
-    fc -s "$_original=$_replacement"
-}
 app () {
         grep -lr "$(echo -e "$1" | sed -e 's|^[^/]*//| |' -e 's|/.*$||')" $HOMEDIR/*/conf | \
         awk 'END{split($0,a,"/"); print a[4]}'
@@ -290,50 +225,6 @@ host () {
 
 master () {
         su $(grep master /etc/passwd | head -n 1 | cut -d ":" -f1)
-        }
-
-fixperm() {
-FPM=php$(php -v  | head -n 1 | cut -d " " -f2 | cut -d "." -f1,2)-fpm
-appsDir=/home/master/applications
-if grep -q "UMask=0002" /lib/systemd/system/$FPM.service
-then
-    echo "The UMask is already added"
-else
-    sed -i -e '/[Service]/aUMask=0002' /lib/systemd/system/$FPM.service
-    systemctl daemon-reload
-    /etc/init.d/$FPM restart
-fi
-        #/usr/bin/curl -s https://raw.githubusercontent.com/aphraz/cloudways/master/permissions.sh?Sdsdads | /bin/bash
-if [ $# -eq 0 ]; then
-                for i in $(ls -l $HOMEDIR/| awk '/^d/ {print $NF}')
-                do
-                        echo -e "\nFixing permissions for: $i"
-                        chown -R $i:www-data $HOMEDIR/$i/public_html
-                        find $HOMEDIR/$i/public_html/ \
-                        \( -type d -not -perm 775 -exec chmod 775 {} + \) \
-                        -or \
-                        \( -type f -not -perm 664 -exec chmod 664 {} + \)
-                done
-else
-                for args in "$@"
-                do
-                        cl_args=${args%/}
-                        if app_exist "${applist[*]}" "$cl_args"; then
-                                echo -e "\nFixing permissions for: $cl_args"
-                                chown -R $cl_args:www-data $HOMEDIR/$cl_args/public_html
-                                find $HOMEDIR/$cl_args/public_html/ \
-                                \( -type d -not -perm 775 -exec chmod 775 {} + \) \
-                                -or \
-                                \( -type f -not -perm 664 -exec chmod 664 {} + \)
-                        else
-                                echo ""
-                                echo -n $'\U274E '
-                                echo "There seems to be no app by the name, $cl_args.."
-                                echo "Available apps are: ${applist[*]}"
-                        fi
-
-                done
-fi
         }
 
 slowlog() {
@@ -364,39 +255,6 @@ slowlog() {
         fi
         }
 
-pidmem () {
-        if [ $# -eq 0 ]; then
-          for A in $(ls -l $HOMEDIR/| gawk '/^d/ {print $NF}');
-            do
-                echo ""
-                echo -e "App: $A"
-                gawk 'NR==1 {print substr($NF, 1, length($NF)-1)}' $HOMEDIR/$A/conf/server.nginx
-                gawk -v OFS="\t"  \
-                'BEGIN{printf("\n%s\t%s\n", "PID","Memory")} {SUM[$11] += $13} END {for (s in SUM) \
-                printf("%d\t%.2f %s\n", s,SUM[s]/1024/1024,"MB") | "sort -nbrk2,2 | head"}' \
-                $HOMEDIR/$A/logs/php-app.access.log
-            done
-        else
-            for args in "$@"
-                do
-                    cl_args=${args%/}
-                    if app_exist "${applist[*]}" "$cl_args"; then
-                        echo ""
-                        echo -e "App: $cl_args"
-                        gawk 'NR==1 {print substr($NF, 1, length($NF)-1)}' $HOMEDIR/$cl_args/conf/server.nginx
-                        gawk -v OFS="\t"  \
-                        'BEGIN{printf("\n%s\t%s\n", "PID","Memory")} {SUM[$11] += $13} END {for (s in SUM) \
-                        printf("%d\t%.2f %s\n", s,SUM[s]/1024/1024,"MB") | "sort -nbrk2,2 | head"}' \
-                        $HOMEDIR/$cl_args/logs/php-app.access.log
-                    else
-                        echo ""
-                        echo -n $'\U274E '
-                        echo "There seems to be no app by the name, $cl_args.."
-                        echo "Available apps are: ${applist[*]}"
-                    fi
-                done
-        fi
-        }
 
 concurr () {
         watch -xtn 0.5 awk '$2 ~ /:0050|:01BB/ && $4 ~ /01/ {count +=1;} END {print "Concurrent Web Connections: ",count}' /proc/net/tcp
