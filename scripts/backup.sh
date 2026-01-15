@@ -6,7 +6,7 @@ APP_NAME="${1:-}"
 BASE_PATH="/home/master/applications/${APP_NAME}"
 WEBROOT="${BASE_PATH}/public_html"
 PRIVATE_HTML="${BASE_PATH}/private_html"
-BACKUP_FILE="${BASE_PATH}/${APP_NAME}.zip"
+BACKUP_FILE="${WEBROOT}/${APP_NAME}.zip"
 SQL_FILE="${WEBROOT}/${APP_NAME}.sql"
 
 usage() {
@@ -45,7 +45,7 @@ fi
 rm -f "$SQL_FILE"
 
 # Set ownership
-chown "${APP_NAME}:${APP_NAME}" "$BACKUP_FILE"
+chown "${APP_NAME}:" "$BACKUP_FILE"
 
 echo "Backup completed successfully:"
 echo " → $BACKUP_FILE"
