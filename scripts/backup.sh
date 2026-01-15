@@ -43,8 +43,7 @@ if ! id "$APP_NAME" &>/dev/null; then
     error_exit "Application user '$APP_NAME' does not exist on this server."
 fi
 
-# 3. Validate application directories
-[[ ! -d "$BASE_PATH" ]] && error_exit "Application path not found: $BASE_PATH"
+# 3. Validate webroot
 [[ ! -d "$WEBROOT" ]] && error_exit "Webroot not found: $WEBROOT"
 
 echo "Application validated: $APP_NAME"
@@ -52,8 +51,8 @@ echo "Webroot: $WEBROOT"
 
 cd "$WEBROOT"
 
-# 4. Export database
-if [[ -f "${WEBROOT}/wp-config.php" ]]; then
+# 4. Export database inside public_html
+if [[ -f "wp-config.php" ]]; then
     echo "WordPress detected. Exporting database using wp-cli."
     wp db export "$SQL_FILE" --allow-root
 else
@@ -61,14 +60,15 @@ else
     mysqldump "$APP_NAME" > "$SQL_FILE"
 fi
 
-# 5. Build list of directories to zip
-ZIP_CONTENTS=("public_html")
+# 5. Build list of directories/files to include in zip
+ZIP_CONTENTS=(".")
 
+# Optionally include private_html (relative path)
 if $INCLUDE_PRIVATE; then
-    if [[ -d "$PRIVATE_HTML" ]]; then
-        if find "$PRIVATE_HTML" -type f | grep -q .; then
+    if [[ -d "../private_html" ]]; then
+        if find ../private_html -type f | grep -q .; then
             echo "Including private_html directory (files detected)."
-            ZIP_CONTENTS+=("private_html")
+            ZIP_CONTENTS+=("../private_html")
         else
             echo "private_html exists but is empty — skipping."
         fi
@@ -77,7 +77,7 @@ if $INCLUDE_PRIVATE; then
     fi
 fi
 
-# 6. Create zip archive
+# 6. Create zip archive inside public_html
 echo "Creating backup archive..."
 zip -r "$BACKUP_FILE" "${ZIP_CONTENTS[@]}"
 
