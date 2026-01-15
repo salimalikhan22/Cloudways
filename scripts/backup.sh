@@ -60,31 +60,28 @@ else
     mysqldump "$APP_NAME" > "$SQL_FILE"
 fi
 
-# 5. Build list of directories/files to include in zip
-ZIP_CONTENTS=(".")
+# 5. Create zip archive including hidden files
+echo "Creating backup archive (optimized with hidden files)..."
 
-# Optionally include private_html (relative path)
+# Include all files in current directory including hidden ones
+find . -mindepth 1 -print | zip -q "$BACKUP_FILE" -@
+
+# Optionally include private_html
 if $INCLUDE_PRIVATE; then
     if [[ -d "../private_html" ]]; then
-        if find ../private_html -type f | grep -q .; then
-            echo "Including private_html directory (files detected)."
-            ZIP_CONTENTS+=("../private_html")
-        else
-            echo "private_html exists but is empty — skipping."
-        fi
+        echo "Including private_html directory..."
+        find ../private_html -type f -print | zip -q "$BACKUP_FILE" -@
     else
-        echo "private_html directory not found — skipping."
+        echo "Warning: private_html directory not found — skipping."
     fi
+else
+    echo "Skipping private_html as requested."
 fi
 
-# 6. Create zip archive inside public_html
-echo "Creating backup archive..."
-zip -r "$BACKUP_FILE" "${ZIP_CONTENTS[@]}"
-
-# 7. Cleanup SQL file
+# 6. Cleanup SQL file
 rm -f "$SQL_FILE"
 
-# 8. Set ownership
+# 7. Set ownership
 chown "${APP_NAME}:" "$BACKUP_FILE"
 
 echo "Backup completed successfully."
