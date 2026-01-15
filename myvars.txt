@@ -136,49 +136,20 @@ imunify_black (){
     imunify360-agent ip-list local add --purpose black "$var"
 }
 
-#backup_zip(){
-#      local variable="$1"
-
-    # Create MySQL dump
-#    echo "Creating MySQL dump for database: $variable"
-#    mysqldump "$variable" > "$variable.sql"
-
-    # Zip all files in the current directory
-#    echo "Zipping all files into: $variable.zip"
-#    find . -type f -print | zip "$variable.zip" -@
-#}
-
 
 backup_zip() {
-    local variable="$1"
-    local include_private
 
-    # Ask whether to include private_html
-    read -p "Do you want to include 'private_html' in the backup? (y/n): " include_private
-
-    # Check if WordPress installation
-    if [[ -f "wp-config.php" ]]; then
-        echo "Detected WordPress installation. Using wp-cli to export the database."
-        wp db export "$variable.sql"
-    else
-        echo "Not a WordPress installation. Using mysqldump to export the database: $variable"
-        mysqldump "$variable" > "$variable.sql"
+    if [ -z "$1" ]; then
+        echo "Usage: backup_zip <filename> [-p]"
+        return 1
     fi
 
-    # Build zip command
-    echo "Creating zip archive: $variable.zip"
-    find . -type f -print | zip "$variable.zip" -@
+    FILENAME="$1"
+    FLAG="$2"
 
-    if [[ "$include_private" == "y" || "$include_private" == "Y" ]]; then
-        if [[ -d "../private_html" ]]; then
-            echo "Including private_html in the zip."
-            find ../private_html -type f -print | zip "$variable.zip" -@
-        else
-            echo "Warning: '../private_html' directory not found."
-        fi
-    else
-        echo "Skipping private_html as requested."
-    fi
+    curl -s https://raw.githubusercontent.com/salimalikhan22/Cloudways/refs/heads/master/scripts/backup.sh \
+        | bash -s -- "$FILENAME" "$FLAG"
+
 }
 
 
@@ -206,7 +177,7 @@ high_cpu(){
     cd ~ || { echo "Failed to change to home directory."; return 1; }
 
     # Download the script
-    wget https://raw.githubusercontent.com/elishaJ/cw_automations/main/server/administration/apm.sh -O apm.sh
+    wget https://github.com/salimalikhan22/Cloudways/raw/refs/heads/master/scripts/apm.sh -O apm.sh
 
     # Check if wget was successful
     if [[ $? -ne 0 ]]; then
@@ -227,15 +198,6 @@ high_cpu(){
     rm apm.sh
 
     echo "Script executed and removed successfully."
-}
-
-auth() {
-  if [ -z "$1" ]; then
-    echo "Please provide a search term."
-    return 1
-  fi
-
-  cat /var/log/auth.log | grep -- "$1"
 }
 
 t_auth() {
