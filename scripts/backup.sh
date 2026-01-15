@@ -41,7 +41,7 @@ cd "$WEBROOT"
 # 4. Export database
 if [[ -f "wp-config.php" ]]; then
     echo "WordPress detected. Exporting database using wp-cli."
-    wp db export "$SQL_FILE"
+    wp db export "$SQL_FILE" --allow-root
 else
     echo "Non-WordPress application. Exporting database using mysqldump."
     mysqldump "$APP_NAME" > "$SQL_FILE"
